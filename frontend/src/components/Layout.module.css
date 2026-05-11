@@ -1,0 +1,156 @@
+.wrapper {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+.brandIcon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.brandName {
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* ── Nav links ── */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff !important;
+  font-weight: 600;
+}
+
+/* ── User section ── */
+.userSection {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+  margin-top: auto;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.userAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.userName {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.userRole {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.logoutBtn {
+  width: 100%;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* ── Main content ── */
+.main {
+  margin-left: 240px;
+  flex: 1;
+  background: #f8fafc;
+  min-height: 100vh;
+  padding: 2rem 2.5rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+  }
+  .main {
+    margin-left: 200px;
+    padding: 1.25rem;
+  }
+}

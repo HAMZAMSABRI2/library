@@ -1,0 +1,429 @@
+/* Shared styles for all CRUD list & form pages */
+
+/* ── Page header ── */
+.page {
+  max-width: 1100px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 0.2rem;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ── Toolbar (search + filters) ── */
+.toolbar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.6rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1a1a2e;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search:focus {
+  border-color: #0f3460;
+  box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.08);
+}
+
+.select {
+  padding: 0.6rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1a1a2e;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.select:focus {
+  border-color: #0f3460;
+}
+
+/* ── Alert ── */
+.alert {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.alertSuccess {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Table ── */
+.tableWrapper {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead tr {
+  background: #f1f5f9;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  color: #374151;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.bold {
+  font-weight: 600;
+  color: #1a1a2e !important;
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badgeGreen {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badgeRed {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badgeBlue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badgeGray {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* ── Loading / Empty ── */
+.loadingRow,
+.emptyRow {
+  padding: 3rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+/* ── Actions column ── */
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ── Pagination ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.pagination button {
+  padding: 0.4rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.pagination button:hover:not(:disabled) {
+  border-color: #0f3460;
+  color: #0f3460;
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Buttons ── */
+.btnPrimary {
+  padding: 0.65rem 1.25rem;
+  background: linear-gradient(135deg, #0f3460, #16213e);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btnEdit {
+  padding: 0.35rem 0.8rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btnEdit:hover {
+  background: #dbeafe;
+}
+
+.btnDelete {
+  padding: 0.35rem 0.8rem;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btnDelete:hover {
+  background: #fee2e2;
+}
+
+.btnReturn {
+  padding: 0.35rem 0.8rem;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btnReturn:hover {
+  background: #dcfce7;
+}
+
+/* ── Form card ── */
+.formCard {
+  background: #fff;
+  border-radius: 14px;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+  max-width: 640px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin-top: 1.5rem;
+}
+
+.row {
+  display: flex;
+  gap: 1rem;
+}
+
+.row .field {
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1a1a2e;
+  background: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  font-family: inherit;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: #0f3460;
+  box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.08);
+  background: #fff;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.formActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btnSubmit {
+  flex: 1;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #0f3460, #16213e);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btnSubmit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btnSubmit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnCancel {
+  padding: 0.75rem 1.25rem;
+  background: #f1f5f9;
+  color: #374151;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnCancel:hover {
+  background: #e2e8f0;
+}
+
+/* ── Spinner ── */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Back link ── */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #64748b;
+  font-size: 0.875rem;
+  text-decoration: none;
+  margin-bottom: 1.25rem;
+  transition: color 0.15s;
+}
+
+.backLink:hover {
+  color: #0f3460;
+}
