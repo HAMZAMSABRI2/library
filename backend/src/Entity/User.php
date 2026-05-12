@@ -21,7 +21,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 180, unique: true)]
     private string $email;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(name: 'password_hash', length: 255)]
     private string $password;
 
     #[ORM\Column(length: 100)]
