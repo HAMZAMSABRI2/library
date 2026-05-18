@@ -11,7 +11,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 #[Route('/api/auth', name: 'api_auth_')]
 class AuthController extends AbstractController
@@ -20,10 +19,43 @@ class AuthController extends AbstractController
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
         private JWTTokenManagerInterface $jwtManager,
+        private UserPasswordHasherInterface $hasher,
     ) {}
 
+    #[Route('/login', name: 'login', methods: ['POST'])]
+    public function login(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+
+        if (empty($data['email']) || empty($data['password'])) {
+            return $this->json(['error' => 'Email et mot de passe requis'], 400);
+        }
+
+        $user = $this->userRepository->findOneBy(['email' => $data['email']]);
+
+        if (!$user || !$this->hasher->isPasswordValid($user, $data['password'])) {
+            return $this->json(['error' => 'Identifiants invalides'], 401);
+        }
+
+        $token = $this->jwtManager->createFromPayload($user, [
+            'email' => $user->getEmail(),
+            'role'  => $user->getRole(),
+        ]);
+
+        return $this->json([
+            'token' => $token,
+            'user'  => [
+                'id'     => $user->getId(),
+                'email'  => $user->getEmail(),
+                'nom'    => $user->getNom(),
+                'prenom' => $user->getPrenom(),
+                'role'   => $user->getRole(),
+            ],
+        ]);
+    }
+
     #[Route('/register', name: 'register', methods: ['POST'])]
-    public function register(Request $request, UserPasswordHasherInterface $hasher): JsonResponse
+    public function register(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
 
@@ -45,7 +77,7 @@ class AuthController extends AbstractController
              ->setRole($data['role'] ?? 'ROLE_USER');
 
         $user->setPassword(
-            $hasher->hashPassword($user, $data['password'])
+            $this->hasher->hashPassword($user, $data['password'])
         );
 
         $this->em->persist($user);
