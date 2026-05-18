@@ -2,6 +2,10 @@
   "permissions": {
     "additionalDirectories": [
       "C:\\Users\\UltraPc\\Downloads"
+    ],
+    "allow": [
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); pkgs=d.get\\('packages',{}\\); print\\('\\\\n'.join\\(k for k in pkgs if k.startswith\\('node_modules/react'\\) or k.startswith\\('node_modules/vite'\\) or k.startswith\\('node_modules/@vitejs'\\)\\)\\)\")",
+      "Bash(node -e \"const d=require\\('./package-lock.json'\\); Object.keys\\(d.packages||{}\\).filter\\(k=>k.includes\\('react'\\)||k.includes\\('vite'\\)||k.includes\\('vitest'\\)\\).forEach\\(k=>console.log\\(k\\)\\)\")"
     ]
   }
 }
