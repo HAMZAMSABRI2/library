@@ -70,7 +70,6 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: librairie_test
         ports:
           - 3306:3306
         options: >-
@@ -109,20 +108,15 @@ jobs:
 
       - name: Setup test environment
         working-directory: backend
-        env:
-          DATABASE_URL: mysql://root:root@127.0.0.1:3306/librairie_test
-          JWT_PASSPHRASE: test_passphrase
         run: |
-          cp .env .env.test.local
-          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/librairie_test" >> .env.test.local
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/librairie_test" > .env.test.local
           echo "JWT_PASSPHRASE=test_passphrase" >> .env.test.local
+          echo "APP_SECRET=test_secret_32chars_key_for_ci!!" >> .env.test.local
+          php bin/console doctrine:database:create --env=test --if-not-exists
           php bin/console doctrine:schema:create --env=test
 
       - name: Run PHPUnit
         working-directory: backend
-        env:
-          DATABASE_URL: mysql://root:root@127.0.0.1:3306/librairie_test
-          JWT_PASSPHRASE: test_passphrase
         run: php vendor/bin/phpunit --coverage-clover=coverage.xml
 
       - name: Upload coverage
