@@ -112,7 +112,7 @@ jobs:
           echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/librairie" > .env.test.local
           echo "JWT_PASSPHRASE=test_passphrase" >> .env.test.local
           echo "APP_SECRET=test_secret_32chars_key_for_ci!!" >> .env.test.local
-          php bin/console doctrine:database:create --env=test --if-not-exists
+          mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE IF NOT EXISTS librairie_test;"
           php bin/console doctrine:schema:create --env=test
 
       - name: Run PHPUnit
