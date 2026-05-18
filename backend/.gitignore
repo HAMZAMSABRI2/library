@@ -7,6 +7,7 @@
 /vendor/
 
 /config/jwt/private.pem
+/coverage.xml
 
 ###> symfony/framework-bundle ###
 /.env.local
