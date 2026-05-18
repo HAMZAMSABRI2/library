@@ -221,7 +221,7 @@ jobs:
 
       - name: Checkmarx AST Scan
         if: steps.cx_check.outputs.skip == 'false'
-        uses: Checkmarx/ast-github-action@v1.0.10
+        uses: Checkmarx/ast-github-action@2.3.36
         with:
           base_uri: ${{ secrets.CX_BASE_URI }}
           cx_client_id: ${{ secrets.CX_CLIENT_ID }}
@@ -229,7 +229,7 @@ jobs:
           cx_tenant: ${{ secrets.CX_TENANT }}
           project_name: BiblioApp
           branch: ${{ github.ref_name }}
-          additional_params: "--scan-types sast,sca --report-format sarif --output-name cx_result --output-path checkmarx-results"
+          scan_params: "--scan-types sast,sca --report-format sarif --output-name cx_result --output-path checkmarx-results"
 
       - name: Upload SARIF to GitHub Security
         if: steps.cx_check.outputs.skip == 'false' && hashFiles('checkmarx-results/cx_result.sarif') != ''
