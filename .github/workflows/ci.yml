@@ -153,11 +153,116 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage/
 
+  # ── TESTS : SELENIUM UI ──────────────────────────────────────────────────────
+  test-selenium:
+    name: Tests Selenium (UI)
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: librairie
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, intl
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: maven-${{ hashFiles('tests-selenium/pom.xml') }}
+          restore-keys: maven-
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --quiet
+
+      - name: Generate JWT keys
+        working-directory: backend
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -algorithm RSA -out config/jwt/private.pem \
+            -aes256 -pass pass:test_passphrase -pkeyopt rsa_keygen_bits:2048
+          openssl pkey -in config/jwt/private.pem \
+            -out config/jwt/public.pem -pubout -passin pass:test_passphrase
+
+      - name: Setup backend environment
+        working-directory: backend
+        run: |
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/librairie" > .env.local
+          echo "JWT_PASSPHRASE=test_passphrase" >> .env.local
+          echo "APP_SECRET=test_secret_32chars_key_for_ci!!" >> .env.local
+          php bin/console doctrine:schema:create --no-interaction
+
+      - name: Start backend server
+        working-directory: backend
+        run: APP_ENV=dev php -S localhost:8000 -t public/ &
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Start frontend dev server
+        working-directory: frontend
+        run: npm run dev &
+
+      - name: Wait for servers to be ready
+        run: |
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/api/auth/login -X POST -H "Content-Type: application/json" -d "{}" > /dev/null 2>&1; do sleep 1; done'
+          timeout 30 bash -c 'until curl -sf http://localhost:5173 > /dev/null 2>&1; do sleep 1; done'
+
+      - name: Create test user
+        run: |
+          curl -s -X POST http://localhost:8000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"hamza@mail.com","password":"123456","nom":"Hamza","prenom":"Test","role":"ROLE_ADMIN"}'
+
+      - name: Run Selenium tests
+        working-directory: tests-selenium
+        env:
+          HEADLESS: "true"
+        run: mvn test -q
+
+      - name: Upload Selenium reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-reports
+          path: tests-selenium/target/surefire-reports/
+
   # ── QUALITÉ : SONARCLOUD ──────────────────────────────────────────────────────
   sonar:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-frontend, test-selenium]
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +305,7 @@ jobs:
   codeql:
     name: CodeQL Security Scan (JavaScript)
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-frontend, test-selenium]
     permissions:
       security-events: write
       actions: read
@@ -225,7 +330,7 @@ jobs:
   php-security:
     name: PHP Security Audit
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-frontend, test-selenium]
     steps:
       - uses: actions/checkout@v4
 
