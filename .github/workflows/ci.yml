@@ -239,11 +239,43 @@ jobs:
           timeout 30 bash -c 'until curl -s http://localhost:8000 > /dev/null 2>&1; do sleep 1; done'
           timeout 30 bash -c 'until curl -s http://localhost:5173 > /dev/null 2>&1; do sleep 1; done'
 
-      - name: Create test user
+      - name: Seed test data
         run: |
+          # --- users table ---
+          # Admin user: credentials used in BaseTest.java (TEST_EMAIL / TEST_PASSWORD)
+          USER_RESP=$(curl -s -X POST http://localhost:8000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"hamza@mail.com","password":"123456","nom":"Hamza","prenom":"Msabri","role":"ROLE_ADMIN"}')
+          USER_ID=$(echo "$USER_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user']['id'])")
+
+          # Extra user (UsersTest + RegisterTest.emailDejaUtilise relies on TEST_EMAIL being taken)
           curl -s -X POST http://localhost:8000/api/auth/register \
             -H "Content-Type: application/json" \
-            -d '{"email":"hamza@mail.com","password":"123456","nom":"Hamza","prenom":"Test","role":"ROLE_ADMIN"}'
+            -d '{"email":"alice@mail.com","password":"password123","nom":"Alice","prenom":"Dupont","role":"ROLE_USER"}'
+
+          # Login to get JWT token for authenticated endpoints
+          TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"hamza@mail.com","password":"123456"}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          # --- livres table ---
+          LIVRE1_ID=$(curl -s -X POST http://localhost:8000/api/livres \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d '{"isbn":"9780000000001","titre":"Le Petit Prince","auteur":"Antoine de Saint-Exupery","editeur":"Gallimard","annee":1943,"stock":5}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+          curl -s -X POST http://localhost:8000/api/livres \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d '{"isbn":"9780000000002","titre":"Les Miserables","auteur":"Victor Hugo","editeur":"Pagnerre","annee":1862,"stock":3}'
+
+          # --- emprunts table ---
+          curl -s -X POST http://localhost:8000/api/emprunts \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "{\"user_id\":$USER_ID,\"livre_id\":$LIVRE1_ID}"
 
       - name: Run Selenium tests
         working-directory: tests-selenium
