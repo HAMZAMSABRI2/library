@@ -344,10 +344,13 @@ jobs:
           name: php-audit
           path: php-audit.json
 
+  # ── IA Security Check ────────────────────────────────────────────────────────
   ia-security-check:
     name: "Security · IA Check (GitHub Models)"
     runs-on: ubuntu-latest
     needs: [codeql, php-security]
+    permissions:
+      models: read          # requis pour GitHub Models API
     steps:
       - uses: actions/checkout@v4
       - name: Download CodeQL SARIF
