@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-IA Security Check — Analyses CodeQL SARIF results using GitHub Models API (free).
-Uses GITHUB_TOKEN — no extra secret required.
-Exits with code 1 if critical vulnerabilities are found.
+IA Security Check — analyses CodeQL SARIF + composer audit JSON
+using GitHub Models API (free, uses GITHUB_TOKEN).
+Exits 1 if critical vulnerabilities are found.
 """
 import json
 import os
@@ -12,46 +12,64 @@ from pathlib import Path
 from openai import OpenAI
 
 
-def load_findings(sarif_dir: str) -> list[dict]:
+def load_sarif_findings(sarif_dir: str) -> list[dict]:
     findings = []
     for sarif_file in Path(sarif_dir).glob("**/*.sarif"):
         with open(sarif_file) as f:
             sarif = json.load(f)
         for run in sarif.get("runs", []):
-            tool = run.get("tool", {}).get("driver", {}).get("name", "CodeQL")
             rules = {
                 r["id"]: r.get("shortDescription", {}).get("text", "")
                 for r in run.get("tool", {}).get("driver", {}).get("rules", [])
             }
             for result in run.get("results", []):
-                location = (
-                    result.get("locations", [{}])[0]
-                    .get("physicalLocation", {})
-                )
+                loc = result.get("locations", [{}])[0].get("physicalLocation", {})
                 findings.append({
-                    "tool": tool,
+                    "source": "CodeQL",
                     "rule": result.get("ruleId", "unknown"),
                     "description": rules.get(result.get("ruleId", ""), ""),
                     "level": result.get("level", "note"),
                     "message": result.get("message", {}).get("text", ""),
-                    "file": location.get("artifactLocation", {}).get("uri", "unknown"),
-                    "line": location.get("region", {}).get("startLine", "?"),
+                    "file": loc.get("artifactLocation", {}).get("uri", "unknown"),
+                    "line": loc.get("region", {}).get("startLine", "?"),
                 })
     return findings
 
 
-def write_report(verdict: str, response: str, findings: list[dict]) -> None:
+def load_composer_audit(audit_file: str) -> list[dict]:
+    findings = []
+    path = Path(audit_file)
+    if not path.exists() or path.stat().st_size == 0:
+        return findings
+    with open(path) as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            return findings
+    for package, advisories in data.get("advisories", {}).items():
+        for adv in advisories:
+            findings.append({
+                "source": "composer-audit",
+                "package": package,
+                "cve": adv.get("cve", "N/A"),
+                "title": adv.get("title", ""),
+                "affected_versions": adv.get("affectedVersions", ""),
+                "level": "error",
+            })
+    return findings
+
+
+def write_report(verdict: str, response: str, sarif: list, composer: list) -> None:
     with open("ia-security-report.md", "w") as f:
         f.write("# IA Security Report\n\n")
         f.write(f"**Verdict: {verdict}**\n\n")
         f.write("## Analysis\n\n")
         f.write(response + "\n\n")
-        f.write("## Raw Findings Summary\n\n")
-        errors = [x for x in findings if x["level"] == "error"]
-        warnings = [x for x in findings if x["level"] == "warning"]
-        f.write(f"- Total findings : {len(findings)}\n")
-        f.write(f"- Error level    : {len(errors)}\n")
-        f.write(f"- Warning level  : {len(warnings)}\n")
+        f.write("## Findings Summary\n\n")
+        f.write(f"| Source | Count |\n|---|---|\n")
+        f.write(f"| CodeQL (JS) | {len(sarif)} |\n")
+        f.write(f"| Composer Audit (PHP CVE) | {len(composer)} |\n")
+        f.write(f"| **Total** | **{len(sarif) + len(composer)}** |\n")
 
 
 def main() -> None:
@@ -60,43 +78,47 @@ def main() -> None:
         print("::error::GITHUB_TOKEN is not available")
         sys.exit(1)
 
-    all_findings: list[dict] = []
-    for directory in ["sarif/php", "sarif/js"]:
-        if Path(directory).exists():
-            all_findings.extend(load_findings(directory))
+    sarif_findings = load_sarif_findings("sarif/js")
+    composer_findings = load_composer_audit("audit/php-audit.json")
+    all_findings = sarif_findings + composer_findings
 
     if not all_findings:
-        print("No CodeQL findings detected.")
-        write_report("PASS", "No security findings were reported by CodeQL.", [])
+        print("No security findings detected.")
+        write_report("PASS", "No findings from CodeQL or composer audit.", [], [])
         print("::notice::IA Security Check PASSED — no findings")
         return
 
-    errors = [f for f in all_findings if f["level"] == "error"]
-    warnings = [f for f in all_findings if f["level"] == "warning"]
+    errors = [f for f in all_findings if f.get("level") == "error"]
+    warnings = [f for f in sarif_findings if f.get("level") == "warning"]
 
-    prompt = f"""You are a senior application security engineer reviewing static analysis results for a Symfony 7 / React application.
+    prompt = f"""You are a senior application security engineer reviewing results for a Symfony 7 / React application.
 
-## CodeQL Scan Summary
-- Total findings   : {len(all_findings)}
-- Error (critical) : {len(errors)}
-- Warning          : {len(warnings)}
-- Note             : {len(all_findings) - len(errors) - len(warnings)}
+## Scan Summary
+- CodeQL (JavaScript) findings : {len(sarif_findings)}
+- Composer audit (PHP CVEs)    : {len(composer_findings)}
+- Total error level            : {len(errors)}
+- Total warning level          : {len(warnings)}
 
-## Findings (up to 30 shown)
+## CodeQL Findings (up to 20)
 ```json
-{json.dumps(all_findings[:30], indent=2)}
+{json.dumps(sarif_findings[:20], indent=2)}
 ```
 
-## Task
-1. Apply these rules to determine a VERDICT:
-   - Any finding with level "error"          → VERDICT: FAIL
-   - More than 10 "warning" level findings   → VERDICT: FAIL
-   - Otherwise                               → VERDICT: PASS
+## Composer Audit — Known CVEs (up to 10)
+```json
+{json.dumps(composer_findings[:10], indent=2)}
+```
 
-2. List the top 3 most critical issues (if any).
-3. Give a one-sentence overall security assessment.
+## Decision rules
+- Any composer audit CVE (package vulnerability)  → VERDICT: FAIL
+- Any CodeQL finding with level "error"            → VERDICT: FAIL
+- More than 10 CodeQL "warning" findings           → VERDICT: FAIL
+- Otherwise                                        → VERDICT: PASS
 
-Start your response with exactly `VERDICT: PASS` or `VERDICT: FAIL` on its own line."""
+Respond with:
+1. `VERDICT: PASS` or `VERDICT: FAIL` on its own first line
+2. Top 3 critical issues (if any)
+3. One-sentence overall security assessment"""
 
     client = OpenAI(
         base_url="https://models.inference.ai.azure.com",
@@ -118,10 +140,10 @@ Start your response with exactly `VERDICT: PASS` or `VERDICT: FAIL` on its own l
     print(answer)
     print("=" * 60)
 
-    write_report(verdict, answer, all_findings)
+    write_report(verdict, answer, sarif_findings, composer_findings)
 
     if verdict == "FAIL":
-        print("::error::IA Security Check FAILED — critical vulnerabilities detected")
+        print("::error::IA Security Check FAILED — vulnerabilities detected")
         sys.exit(1)
     else:
         print("::notice::IA Security Check PASSED")
