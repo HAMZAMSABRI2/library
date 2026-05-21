@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-IA Security Check — Analyses CodeQL SARIF results using Claude API.
+IA Security Check — Analyses CodeQL SARIF results using GitHub Models API (free).
+Uses GITHUB_TOKEN — no extra secret required.
 Exits with code 1 if critical vulnerabilities are found.
 """
-import anthropic
 import json
 import os
 import sys
 from pathlib import Path
+
+from openai import OpenAI
 
 
 def load_findings(sarif_dir: str) -> list[dict]:
@@ -42,20 +44,20 @@ def write_report(verdict: str, response: str, findings: list[dict]) -> None:
     with open("ia-security-report.md", "w") as f:
         f.write("# IA Security Report\n\n")
         f.write(f"**Verdict: {verdict}**\n\n")
-        f.write("## Claude Analysis\n\n")
+        f.write("## Analysis\n\n")
         f.write(response + "\n\n")
         f.write("## Raw Findings Summary\n\n")
-        f.write(f"- Total findings: {len(findings)}\n")
-        errors = [x for x in findings if x['level'] == 'error']
-        warnings = [x for x in findings if x['level'] == 'warning']
-        f.write(f"- Error level: {len(errors)}\n")
-        f.write(f"- Warning level: {len(warnings)}\n")
+        errors = [x for x in findings if x["level"] == "error"]
+        warnings = [x for x in findings if x["level"] == "warning"]
+        f.write(f"- Total findings : {len(findings)}\n")
+        f.write(f"- Error level    : {len(errors)}\n")
+        f.write(f"- Warning level  : {len(warnings)}\n")
 
 
 def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("::error::ANTHROPIC_API_KEY secret is not set")
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        print("::error::GITHUB_TOKEN is not available")
         sys.exit(1)
 
     all_findings: list[dict] = []
@@ -75,44 +77,48 @@ def main() -> None:
     prompt = f"""You are a senior application security engineer reviewing static analysis results for a Symfony 7 / React application.
 
 ## CodeQL Scan Summary
-- Total findings: {len(all_findings)}
-- Error (critical) level: {len(errors)}
-- Warning level: {len(warnings)}
-- Note level: {len(all_findings) - len(errors) - len(warnings)}
+- Total findings   : {len(all_findings)}
+- Error (critical) : {len(errors)}
+- Warning          : {len(warnings)}
+- Note             : {len(all_findings) - len(errors) - len(warnings)}
 
 ## Findings (up to 30 shown)
 ```json
 {json.dumps(all_findings[:30], indent=2)}
 ```
 
-## Your task
-1. Determine a VERDICT using these strict rules:
-   - Any finding with level "error" → **VERDICT: FAIL**
-   - More than 10 "warning" level findings → **VERDICT: FAIL**
-   - Otherwise → **VERDICT: PASS**
+## Task
+1. Apply these rules to determine a VERDICT:
+   - Any finding with level "error"          → VERDICT: FAIL
+   - More than 10 "warning" level findings   → VERDICT: FAIL
+   - Otherwise                               → VERDICT: PASS
 
 2. List the top 3 most critical issues (if any).
 3. Give a one-sentence overall security assessment.
 
 Start your response with exactly `VERDICT: PASS` or `VERDICT: FAIL` on its own line."""
 
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=token,
     )
 
-    response = message.content[0].text
-    verdict = "FAIL" if "VERDICT: FAIL" in response else "PASS"
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1024,
+    )
+
+    answer = response.choices[0].message.content
+    verdict = "FAIL" if "VERDICT: FAIL" in answer else "PASS"
 
     print("=" * 60)
-    print("IA SECURITY ANALYSIS REPORT")
+    print("IA SECURITY ANALYSIS REPORT (GitHub Models — gpt-4o-mini)")
     print("=" * 60)
-    print(response)
+    print(answer)
     print("=" * 60)
 
-    write_report(verdict, response, all_findings)
+    write_report(verdict, answer, all_findings)
 
     if verdict == "FAIL":
         print("::error::IA Security Check FAILED — critical vulnerabilities detected")

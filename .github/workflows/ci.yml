@@ -292,12 +292,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Anthropic SDK
-        run: pip install anthropic
+      - name: Install OpenAI SDK
+        run: pip install openai
 
       - name: Run IA Security Analysis
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/ia_security_check.py
 
       - name: Upload IA Security Report
