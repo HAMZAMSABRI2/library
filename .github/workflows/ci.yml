@@ -7,9 +7,12 @@ on:
     branches: [master, main]
 
 jobs:
-  # ── BUILD ────────────────────────────────────────────────────────────────────
-  build-backend:
-    name: Build Backend
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # STEP 1 ── CLEAN
+  # ══════════════════════════════════════════════════════════════════════════════
+  clean-backend:
+    name: "Clean · Backend"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +22,6 @@ jobs:
         with:
           php-version: '8.2'
           extensions: pdo, pdo_mysql, intl
-          coverage: xdebug
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
@@ -32,8 +34,16 @@ jobs:
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
 
-  build-frontend:
-    name: Build Frontend
+      - name: Validate composer.json
+        working-directory: backend
+        run: composer validate --strict
+
+      - name: PHP syntax check
+        working-directory: backend
+        run: find src -name "*.php" | xargs -n 1 php -l
+
+  clean-frontend:
+    name: "Clean · Frontend"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,21 +59,17 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build
+      - name: TypeScript check
         working-directory: frontend
-        run: npm run build
+        run: npx tsc --noEmit
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-
-  # ── TESTS ────────────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════════
+  # STEP 2 ── TEST
+  # ══════════════════════════════════════════════════════════════════════════════
   test-backend:
-    name: Tests Backend (PHPUnit)
+    name: "Test · Backend (PHPUnit)"
     runs-on: ubuntu-latest
-    needs: build-backend
+    needs: clean-backend
 
     services:
       mysql:
@@ -126,9 +132,9 @@ jobs:
           path: backend/coverage.xml
 
   test-frontend:
-    name: Tests Frontend (Vitest)
+    name: "Test · Frontend (Vitest)"
     runs-on: ubuntu-latest
-    needs: build-frontend
+    needs: clean-frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -292,7 +298,7 @@ jobs:
 
   # ── QUALITÉ : SONARCLOUD ──────────────────────────────────────────────────────
   sonar:
-    name: SonarCloud Analysis
+    name: "Quality · SonarCloud"
     runs-on: ubuntu-latest
     needs: [test-backend, test-frontend, test-selenium]
     continue-on-error: true
