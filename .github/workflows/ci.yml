@@ -196,27 +196,25 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # ══════════════════════════════════════════════════════════════════════════════
-  # STEP 4 ── SÉCURITÉ (CodeQL — gratuit GitHub)
+  # STEP 4 ── SÉCURITÉ
   # ══════════════════════════════════════════════════════════════════════════════
-  codeql:
-    name: "Security · CodeQL (${{ matrix.language }})"
+
+  # 4a. CodeQL static analysis — PHP
+  codeql-php:
+    name: "Security · CodeQL (PHP)"
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: sonar
     permissions:
       security-events: write
       actions: read
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [php, javascript-typescript]
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: php
           queries: security-and-quality
 
       - name: Autobuild
@@ -225,50 +223,193 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:php"
+          output: sarif-results
+          upload: true
 
-  # ══════════════════════════════════════════════════════════════════════════════
-  # STEP 5 ── BUILD (Docker images → GHCR)
-  # ══════════════════════════════════════════════════════════════════════════════
-  build-docker:
-    name: "Build · Docker Images"
+      - name: Upload PHP SARIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarif-php
+          path: sarif-results/
+
+  # 4b. CodeQL static analysis — JavaScript / TypeScript
+  codeql-js:
+    name: "Security · CodeQL (JS/TS)"
     runs-on: ubuntu-latest
-    needs: [sonar, codeql]
+    needs: sonar
     permissions:
+      security-events: write
+      actions: read
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+          output: sarif-results
+          upload: true
+
+      - name: Upload JS SARIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarif-js
+          path: sarif-results/
+
+  # 4c. IA Security Check — Claude analyses CodeQL SARIF results
+  ia-security-check:
+    name: "Security · IA Check (Claude)"
+    runs-on: ubuntu-latest
+    needs: [codeql-php, codeql-js]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PHP SARIF
+        uses: actions/download-artifact@v4
+        with:
+          name: sarif-php
+          path: sarif/php/
+
+      - name: Download JS SARIF
+        uses: actions/download-artifact@v4
+        with:
+          name: sarif-js
+          path: sarif/js/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Anthropic SDK
+        run: pip install anthropic
+
+      - name: Run IA Security Analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python .github/scripts/ia_security_check.py
+
+      - name: Upload IA Security Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ia-security-report
+          path: ia-security-report.md
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # RELEASE V1.0.x — Généré après Security, stocké dans Artifactory
+  # ══════════════════════════════════════════════════════════════════════════════
+  release:
+    name: "Release · V1.0.${{ github.run_number }}"
+    runs-on: ubuntu-latest
+    needs: ia-security-check
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set version tag
+        id: version
+        run: echo "tag=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+
+      - name: Create release archive
+        run: |
+          VERSION=${{ steps.version.outputs.tag }}
+          tar -czf release-${VERSION}.tar.gz \
+            --exclude='.git' \
+            --exclude='backend/vendor' \
+            --exclude='frontend/node_modules' \
+            .
+          echo "RELEASE_FILE=release-${VERSION}.tar.gz" >> $GITHUB_ENV
+
+      - name: Upload release to Artifactory Generic repository
+        run: |
+          jf rt upload \
+            "${RELEASE_FILE}" \
+            "libs-release-local/biblioapp/${{ steps.version.outputs.tag }}/" \
+            --build-name="BiblioApp" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Publish build info to Artifactory
+        run: |
+          jf rt build-publish BiblioApp ${{ github.run_number }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Release ${{ steps.version.outputs.tag }}"
+          body: |
+            ## Release ${{ steps.version.outputs.tag }}
+            - Commit: `${{ github.sha }}`
+            - CodeQL (PHP + JS/TS): passed
+            - IA Security Check: passed
+            - SonarCloud: passed
+          files: ${{ env.RELEASE_FILE }}
+          generate_release_notes: true
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # STEP 5 ── BUILD — Images Docker → Artifactory Docker Registry
+  # ══════════════════════════════════════════════════════════════════════════════
+  build-docker:
+    name: "Build · Docker → Artifactory"
+    runs-on: ubuntu-latest
+    needs: release
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push backend image
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+
+      - name: Configure Docker to use Artifactory registry
+        run: jf docker login ${{ secrets.JFROG_DOCKER_REGISTRY }}
+
+      - name: Build & push backend image to Artifactory
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: ${{ github.ref == 'refs/heads/master' }}
+          push: true
           tags: |
-            ghcr.io/${{ github.repository }}/backend:latest
-            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:latest
+            ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & push frontend image
+      - name: Build & push frontend image to Artifactory
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          push: ${{ github.ref == 'refs/heads/master' }}
+          push: true
           tags: |
-            ghcr.io/${{ github.repository }}/frontend:latest
-            ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+            ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:latest
+            ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -284,9 +425,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to production
+      - name: Deploy from Artifactory
         run: |
-          echo "Deploying version ${{ github.sha }}"
-          echo "  backend  → ghcr.io/${{ github.repository }}/backend:${{ github.sha }}"
-          echo "  frontend → ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}"
+          echo "Deploying ${{ needs.release.outputs.version }} to production"
+          echo "  backend  → ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:${{ needs.release.outputs.version }}"
+          echo "  frontend → ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:${{ needs.release.outputs.version }}"
           # TODO: remplacer par la commande réelle (SSH, kubectl, docker-compose pull, etc.)
