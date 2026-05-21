@@ -308,13 +308,16 @@ jobs:
           path: ia-security-report.md
 
   # ══════════════════════════════════════════════════════════════════════════════
-  # RELEASE V1.0.x — Généré après Security, stocké dans Artifactory
+  # RELEASE V1.0.x — Généré après Security
+  # Archive source → GitHub Releases  |  Images Docker → GHCR
   # ══════════════════════════════════════════════════════════════════════════════
   release:
     name: "Release · V1.0.${{ github.run_number }}"
     runs-on: ubuntu-latest
     needs: ia-security-check
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.tag }}
     steps:
@@ -326,12 +329,6 @@ jobs:
         id: version
         run: echo "tag=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v4
-        env:
-          JF_URL: ${{ secrets.JFROG_URL }}
-          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
-
       - name: Create release archive
         run: |
           VERSION=${{ steps.version.outputs.tag }}
@@ -342,74 +339,63 @@ jobs:
             .
           echo "RELEASE_FILE=release-${VERSION}.tar.gz" >> $GITHUB_ENV
 
-      - name: Upload release to Artifactory Generic repository
-        run: |
-          jf rt upload \
-            "${RELEASE_FILE}" \
-            "libs-release-local/biblioapp/${{ steps.version.outputs.tag }}/" \
-            --build-name="BiblioApp" \
-            --build-number="${{ github.run_number }}"
-
-      - name: Publish build info to Artifactory
-        run: |
-          jf rt build-publish BiblioApp ${{ github.run_number }}
-
-      - name: Create GitHub Release
+      - name: Publish GitHub Release (= Artifactory Generic)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: "Release ${{ steps.version.outputs.tag }}"
           body: |
             ## Release ${{ steps.version.outputs.tag }}
-            - Commit: `${{ github.sha }}`
-            - CodeQL (PHP + JS/TS): passed
-            - IA Security Check: passed
-            - SonarCloud: passed
+            - Commit : `${{ github.sha }}`
+            - CodeQL PHP + JS/TS : passed
+            - IA Security Check  : passed
+            - SonarCloud         : passed
           files: ${{ env.RELEASE_FILE }}
           generate_release_notes: true
 
   # ══════════════════════════════════════════════════════════════════════════════
-  # STEP 5 ── BUILD — Images Docker → Artifactory Docker Registry
+  # STEP 5 ── BUILD — Images Docker → GHCR (GitHub Container Registry)
   # ══════════════════════════════════════════════════════════════════════════════
   build-docker:
-    name: "Build · Docker → Artifactory"
+    name: "Build · Docker → GHCR"
     runs-on: ubuntu-latest
     needs: release
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Setup JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v4
-        env:
-          JF_URL: ${{ secrets.JFROG_URL }}
-          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure Docker to use Artifactory registry
-        run: jf docker login ${{ secrets.JFROG_DOCKER_REGISTRY }}
-
-      - name: Build & push backend image to Artifactory
+      - name: Build & push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
-            ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:latest
-            ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & push frontend image to Artifactory
+      - name: Build & push frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
           tags: |
-            ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:latest
-            ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository }}/frontend:latest
+            ghcr.io/${{ github.repository }}/frontend:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -419,15 +405,15 @@ jobs:
   deploy:
     name: "Deploy · Production"
     runs-on: ubuntu-latest
-    needs: build-docker
+    needs: [release, build-docker]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy from Artifactory
+      - name: Deploy from GHCR
         run: |
           echo "Deploying ${{ needs.release.outputs.version }} to production"
-          echo "  backend  → ${{ secrets.JFROG_DOCKER_REGISTRY }}/backend:${{ needs.release.outputs.version }}"
-          echo "  frontend → ${{ secrets.JFROG_DOCKER_REGISTRY }}/frontend:${{ needs.release.outputs.version }}"
+          echo "  backend  → ghcr.io/${{ github.repository }}/backend:${{ needs.release.outputs.version }}"
+          echo "  frontend → ghcr.io/${{ github.repository }}/frontend:${{ needs.release.outputs.version }}"
           # TODO: remplacer par la commande réelle (SSH, kubectl, docker-compose pull, etc.)
