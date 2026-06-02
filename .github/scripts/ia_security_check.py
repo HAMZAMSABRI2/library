@@ -50,7 +50,7 @@ def load_composer_audit(audit_file: str) -> list[dict]:
             return findings
     for package, advisories in data.get("advisories", {}).items():
         for adv in advisories:
-            severity = adv.get("severity", "unknown").lower()
+            severity = (adv.get("severity") or "unknown").lower()
             findings.append({
                 "source": "composer-audit",
                 "package": package,

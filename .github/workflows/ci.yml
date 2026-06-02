@@ -403,11 +403,12 @@ jobs:
       - name: Create release archive
         run: |
           VERSION=${{ steps.version.outputs.tag }}
-          tar -czf release-${VERSION}.tar.gz \
+          tar -czf /tmp/release-${VERSION}.tar.gz \
             --exclude='.git' \
             --exclude='backend/vendor' \
             --exclude='frontend/node_modules' \
             .
+          cp /tmp/release-${VERSION}.tar.gz .
           echo "RELEASE_FILE=release-${VERSION}.tar.gz" >> $GITHUB_ENV
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
