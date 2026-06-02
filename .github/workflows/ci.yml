@@ -13,7 +13,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   clean-backend:
     name: "Clean · Backend"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - name: Setup PHP
@@ -39,7 +39,7 @@ jobs:
 
   clean-frontend:
     name: "Clean · Frontend"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
@@ -60,7 +60,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   test-backend:
     name: "Test · Backend (PHPUnit)"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: clean-backend
     services:
       mysql:
@@ -116,7 +116,7 @@ jobs:
 
   test-frontend:
     name: "Test · Frontend (Vitest)"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: clean-frontend
     steps:
       - uses: actions/checkout@v4
@@ -141,7 +141,7 @@ jobs:
   # ── TESTS : SELENIUM UI ──────────────────────────────────────────────────────
   test-selenium:
     name: Tests Selenium (UI)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [test-backend, test-frontend]
     services:
       mysql:
@@ -253,7 +253,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   sonar:
     name: "Quality · SonarCloud"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [test-backend, test-frontend, test-selenium]
     continue-on-error: true
     steps:
@@ -294,7 +294,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   codeql:
     name: "Security · CodeQL (JavaScript)"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [test-backend, test-frontend, test-selenium]
     permissions:
       security-events: write
@@ -322,7 +322,7 @@ jobs:
 
   php-security:
     name: "Security · PHP Audit"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [test-backend, test-frontend, test-selenium]
     steps:
       - uses: actions/checkout@v4
@@ -347,7 +347,7 @@ jobs:
   # ── IA Security Check ────────────────────────────────────────────────────────
   ia-security-check:
     name: "Security · IA Check (GitHub Models)"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [codeql, php-security]
     continue-on-error: true
     permissions:
@@ -386,7 +386,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   release:
     name: "Release · V1.0.${{ github.run_number }}"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [sonar, ia-security-check]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
@@ -427,13 +427,21 @@ jobs:
             - IA Check       : passed
           files: ${{ env.RELEASE_FILE }}
           generate_release_notes: true
+      - name: Upload release archive to JFrog Generic
+        run: |
+          curl -u "${{ secrets.JFROG_USERNAME }}:${{ secrets.JFROG_ACCESS_TOKEN }}" \
+            -X PUT \
+            "https://trial4rbrwt.jfrog.io/artifactory/generic-local/releases/${{ steps.version.outputs.tag }}/${{ env.RELEASE_FILE }}" \
+            -T ${{ env.RELEASE_FILE }} \
+            --fail
+          echo "✅ Release ${{ steps.version.outputs.tag }} uploaded to JFrog Generic"
 
   # ══════════════════════════════════════════════════════════════════════════════
   # STEP 5 ── BUILD
   # ══════════════════════════════════════════════════════════════════════════════
   build-docker:
     name: "Build · Docker → JFrog Artifactory"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: release
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
@@ -474,7 +482,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   test-jfrog:
     name: "Test · JFrog Artifactory"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [build-docker, release]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
@@ -514,7 +522,7 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════════════
   deploy:
     name: "Deploy · Production"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [release, build-docker, test-jfrog]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment: production
