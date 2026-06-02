@@ -493,29 +493,15 @@ jobs:
           echo "JFrog ping → HTTP $HTTP"
           [ "$HTTP" = "200" ] || { echo "❌ JFrog unreachable (HTTP $HTTP)"; exit 1; }
 
-      - name: Verify backend image exists in JFrog
+      - name: Pull & verify backend image from JFrog
         run: |
-          VERSION=${{ needs.release.outputs.version }}
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-            -u "${{ secrets.JFROG_USERNAME }}:${{ secrets.JFROG_ACCESS_TOKEN }}" \
-            "https://trial4rbrwt.jfrog.io/artifactory/api/storage/docker-local/backend/${VERSION}/manifest.json")
-          echo "Backend image check → HTTP $HTTP"
-          [ "$HTTP" = "200" ] || { echo "❌ Backend image not found in JFrog (HTTP $HTTP)"; exit 1; }
+          docker pull trial4rbrwt.jfrog.io/docker-local/backend:${{ needs.release.outputs.version }}
+          echo "✅ Backend image pulled successfully"
 
-      - name: Verify frontend image exists in JFrog
+      - name: Pull & verify frontend image from JFrog
         run: |
-          VERSION=${{ needs.release.outputs.version }}
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-            -u "${{ secrets.JFROG_USERNAME }}:${{ secrets.JFROG_ACCESS_TOKEN }}" \
-            "https://trial4rbrwt.jfrog.io/artifactory/api/storage/docker-local/frontend/${VERSION}/manifest.json")
-          echo "Frontend image check → HTTP $HTTP"
-          [ "$HTTP" = "200" ] || { echo "❌ Frontend image not found in JFrog (HTTP $HTTP)"; exit 1; }
-
-      - name: Pull backend image from JFrog
-        run: docker pull trial4rbrwt.jfrog.io/docker-local/backend:${{ needs.release.outputs.version }}
-
-      - name: Pull frontend image from JFrog
-        run: docker pull trial4rbrwt.jfrog.io/docker-local/frontend:${{ needs.release.outputs.version }}
+          docker pull trial4rbrwt.jfrog.io/docker-local/frontend:${{ needs.release.outputs.version }}
+          echo "✅ Frontend image pulled successfully"
 
       - name: Summary
         run: |
